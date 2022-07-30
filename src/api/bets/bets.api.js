@@ -1,7 +1,6 @@
 const router = require('express').Router();
 const { betValidation } = require('../../validation');
 const jwt = require('jsonwebtoken');
-const { db } = require('../../db');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
 const {
 	auth: authService,
@@ -22,35 +21,30 @@ router.post(
 		const tokenPayload = jwt.verify(token, process.env.JWT_SECRET);
 		const userId = tokenPayload.id;
 		try {
-			req.body.event_id = req.body.eventId;
-			req.body.bet_amount = req.body.betAmount;
-			delete req.body.eventId;
-			delete req.body.betAmount;
-			req.body.user_id = userId;
+			req.body.userId = userId;
 			authService.getAllUsers().then((users) => {
 				var user = users.find((u) => u.id == userId);
-				console.log(users, userId);
 				if (!user) {
 					return next({ status: 400, message: 'User does not exist' });
 				}
-				if (+user.balance < +req.body.bet_amount) {
+				if (+user.balance < +req.body.betAmount) {
 					return next({ status: 400, message: 'Not enough balance' });
 				}
-				eventsService.getEventById(req.body.event_id).then(([event]) => {
+				eventsService.getEventById(req.body.eventId).then(([event]) => {
 					if (!event) {
 						return next({ status: 404, message: 'Event not found' });
 					}
-					oddsService.getOddsById(event.odds_id).then(([odds]) => {
+					oddsService.getOddsById(event.oddsId).then(([odds]) => {
 						if (!odds) {
 							return next({ status: 404, message: 'Odds not found' });
 						}
 						let multiplier;
 						switch (req.body.prediction) {
 							case 'w1':
-								multiplier = odds.home_win;
+								multiplier = odds.homeWin;
 								break;
 							case 'w2':
-								multiplier = odds.away_win;
+								multiplier = odds.awayWin;
 								break;
 							case 'x':
 								multiplier = odds.draw;
@@ -60,33 +54,14 @@ router.post(
 							.createBet({
 								...req.body,
 								multiplier,
-								event_id: event.id,
+								eventId: event.id,
 							})
 							.then(([bet]) => {
-								var currentBalance = user.balance - req.body.bet_amount;
+								var currentBalance = user.balance - req.body.betAmount;
 								authService
 									.updateUser(userId, { balance: currentBalance })
 									.then(() => {
 										services.emitter.statEmitter.emit('newBet');
-										[
-											'bet_amount',
-											'event_id',
-											'away_team',
-											'home_team',
-											'odds_id',
-											'start_at',
-											'updated_at',
-											'created_at',
-											'user_id',
-										].forEach((whatakey) => {
-											var index = whatakey.indexOf('_');
-											var newKey = whatakey.replace('_', '');
-											newKey = newKey.split('');
-											newKey[index] = newKey[index].toUpperCase();
-											newKey = newKey.join('');
-											bet[newKey] = bet[whatakey];
-											delete bet[whatakey];
-										});
 										return res.send({
 											...bet,
 											currentBalance: currentBalance,

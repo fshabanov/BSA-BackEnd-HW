@@ -1,6 +1,5 @@
 const router = require('express').Router();
 const { transactionValidation } = require('../../validation');
-const { db } = require('../../db');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
 const {
 	auth: authService,
@@ -20,27 +19,11 @@ router.post(
 				if (!user) {
 					return next({ status: 400, message: 'User does not exist' });
 				}
-				req.body.card_number = req.body.cardNumber;
-				delete req.body.cardNumber;
-				req.body.user_id = req.body.userId;
-				delete req.body.userId;
 				transactionsService.createTransaction(req.body).then(([result]) => {
 					var currentBalance = req.body.amount + user.balance;
-					db('user')
-						.where('id', req.body.user_id)
-						.update('balance', currentBalance)
+					authService
+						.updateUser(req.body.userId, { balance: currentBalance })
 						.then(() => {
-							['user_id', 'card_number', 'created_at', 'updated_at'].forEach(
-								(whatakey) => {
-									var index = whatakey.indexOf('_');
-									var newKey = whatakey.replace('_', '');
-									newKey = newKey.split('');
-									newKey[index] = newKey[index].toUpperCase();
-									newKey = newKey.join('');
-									result[newKey] = result[whatakey];
-									delete result[whatakey];
-								}
-							);
 							return res.send({
 								...result,
 								currentBalance,
@@ -49,6 +32,7 @@ router.post(
 				});
 			})
 			.catch((err) => {
+				console.log(err);
 				return next({ status: 500 });
 			});
 	}

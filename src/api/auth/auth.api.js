@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const { db } = require('../../db');
 const { authValidation } = require('../../validation');
 const {
 	emitter: emitterService,
@@ -35,10 +34,6 @@ router.post('/', validateBody(authValidation.createUser), (req, res, next) => {
 	authService
 		.createUser(req.body)
 		.then(([result]) => {
-			result.createdAt = result.created_at;
-			delete result.created_at;
-			result.updatedAt = result.updated_at;
-			delete result.updated_at;
 			emitterService.statEmitter.emit('newUser');
 			return res.send({
 				...result,

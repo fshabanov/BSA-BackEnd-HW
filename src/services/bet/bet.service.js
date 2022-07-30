@@ -1,7 +1,7 @@
 const { db } = require('../../db');
 
 const getBetsWithNoWin = (eventId) =>
-	db('bet').where('event_id', eventId).andWhere('win', null);
+	db('bet').where('eventId', eventId).andWhere('win', null);
 
 const createBet = (body) => db('bet').insert(body).returning('*');
 
