@@ -1,7 +1,10 @@
 const router = require('express').Router();
 const { db } = require('../../db');
 const { authValidation } = require('../../validation');
-const services = require('../../services');
+const {
+	emitter: emitterService,
+	auth: authService,
+} = require('../../services');
 const jwt = require('jsonwebtoken');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
 
@@ -12,17 +15,14 @@ router.get(
 	validateParams(authValidation.getUserById),
 	(req, res, next) => {
 		try {
-			db('user')
-				.where('id', req.params.id)
-				.returning('*')
-				.then(([result]) => {
-					if (!result) {
-						return next({ status: 404, message: 'User not found' });
-					}
-					return res.send({
-						...result,
-					});
+			authService.getUserById(req.params.id).then(([result]) => {
+				if (!result) {
+					return next({ status: 404, message: 'User not found' });
+				}
+				return res.send({
+					...result,
 				});
+			});
 		} catch (err) {
 			console.log(err);
 			return next({ status: 500 });
@@ -32,15 +32,14 @@ router.get(
 
 router.post('/', validateBody(authValidation.createUser), (req, res, next) => {
 	req.body.balance = 0;
-	db('user')
-		.insert(req.body)
-		.returning('*')
+	authService
+		.createUser(req.body)
 		.then(([result]) => {
 			result.createdAt = result.created_at;
 			delete result.created_at;
 			result.updatedAt = result.updated_at;
 			delete result.updated_at;
-			services.emitter.statEmitter.emit('newUser');
+			emitterService.statEmitter.emit('newUser');
 			return res.send({
 				...result,
 				accessToken: jwt.sign(
@@ -72,10 +71,8 @@ router.put(
 		if (req.params.id !== tokenPayload.id) {
 			return next({ status: 401, message: 'UserId mismatch' });
 		}
-		db('user')
-			.where('id', req.params.id)
-			.update(req.body)
-			.returning('*')
+		authService
+			.updateUser(req.params.id, req.body)
 			.then(([result]) => {
 				return res.send({
 					...result,
