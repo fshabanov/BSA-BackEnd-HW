@@ -42,46 +42,33 @@ router.put(
 	'/:id',
 	authMiddleware.isAdmin,
 	validateBody(eventValidation.updateEvent),
-	(req, res) => {
+	async (req, res) => {
 		try {
 			var eventId = req.params.id;
 			console.log(eventId);
-			betService.getBetsWithNoWin(eventId).then((bets) => {
-				var [w1, w2] = req.body.score.split(':');
-				let result;
-				if (+w1 > +w2) {
-					result = 'w1';
-				} else if (+w2 > +w1) {
-					result = 'w2';
-				} else {
-					result = 'x';
-				}
-				eventsService
-					.updateEvent(eventId, { score: req.body.score })
-					.then(([event]) => {
-						Promise.all(
-							bets.map((bet) => {
-								if (bet.prediction == result) {
-									betService.updateBet(bet.id, {
-										win: true,
-									});
-									authService.getUserById(bet.userId).then(([user]) => {
-										return authService.updateUser(bet.userId, {
-											balance: user.balance + bet.betAmount * bet.multiplier,
-										});
-									});
-								} else if (bet.prediction != result) {
-									return betService.updateBet(bet.id, {
-										win: false,
-									});
-								}
-							})
-						).then(() => {});
-						setTimeout(() => {
-							res.send(event);
-						}, 1000);
-					});
+			const bets = await betService.getBetsWithNoWin(eventId);
+			var [w1, w2] = req.body.score.split(':');
+			const result = +w1 > +w2 ? 'w1' : +w1 < +w2 ? 'w2' : 'x';
+			const [event] = await eventsService.updateEvent(eventId, {
+				score: req.body.score,
 			});
+			await Promise.all(
+				bets.map(async (bet) => {
+					if (bet.prediction == result) {
+						betService.updateBet(bet.id, {
+							win: true,
+						});
+						const [user] = await authService.getUserById(bet.userId);
+						return authService.updateUser(bet.userId, {
+							balance: user.balance + bet.betAmount * bet.multiplier,
+						});
+					}
+					return betService.updateBet(bet.id, {
+						win: false,
+					});
+				})
+			);
+			res.send(event);
 		} catch (err) {
 			console.log(err);
 			return next({ status: 500 });

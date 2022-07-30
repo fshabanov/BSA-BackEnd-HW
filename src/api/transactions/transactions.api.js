@@ -12,29 +12,25 @@ router.post(
 	'/',
 	authMiddleware.isAdmin,
 	validateBody(transactionValidation.createTransaction),
-	(req, res, next) => {
-		authService
-			.getUserById(req.body.userId)
-			.then(([user]) => {
-				if (!user) {
-					return next({ status: 400, message: 'User does not exist' });
-				}
-				transactionsService.createTransaction(req.body).then(([result]) => {
-					var currentBalance = req.body.amount + user.balance;
-					authService
-						.updateUser(req.body.userId, { balance: currentBalance })
-						.then(() => {
-							return res.send({
-								...result,
-								currentBalance,
-							});
-						});
-				});
-			})
-			.catch((err) => {
-				console.log(err);
-				return next({ status: 500 });
+	async (req, res, next) => {
+		try {
+			const [user] = await authService.getUserById(req.body.userId);
+			if (!user) {
+				return next({ status: 400, message: 'User does not exist' });
+			}
+			const [result] = await transactionsService.createTransaction(req.body);
+			const currentBalance = req.body.amount + user.balance;
+			await authService.updateUser(req.body.userId, {
+				balance: currentBalance,
 			});
+			return res.send({
+				...result,
+				currentBalance,
+			});
+		} catch (err) {
+			console.log(err);
+			return next({ status: 500 });
+		}
 	}
 );
 

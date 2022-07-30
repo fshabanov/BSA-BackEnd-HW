@@ -8,6 +8,7 @@ const {
 	events: eventsService,
 	odds: oddsService,
 } = require('../../services');
+const { getMultiplier, getUserIdByToken } = require('../../helpers');
 
 const { validateBody } = validatorMiddleware;
 
@@ -15,60 +16,40 @@ router.post(
 	'/',
 	authMiddleware.isLoggedIn,
 	validateBody(betValidation.createBet),
-	(req, res, next) => {
+	async (req, res, next) => {
 		let token = req.headers['authorization'];
-		token = token.replace('Bearer ', '');
-		const tokenPayload = jwt.verify(token, process.env.JWT_SECRET);
-		const userId = tokenPayload.id;
+		const userId = getUserIdByToken(token);
+		req.body.userId = userId;
 		try {
-			req.body.userId = userId;
-			authService.getAllUsers().then((users) => {
-				var user = users.find((u) => u.id == userId);
-				if (!user) {
-					return next({ status: 400, message: 'User does not exist' });
-				}
-				if (+user.balance < +req.body.betAmount) {
-					return next({ status: 400, message: 'Not enough balance' });
-				}
-				eventsService.getEventById(req.body.eventId).then(([event]) => {
-					if (!event) {
-						return next({ status: 404, message: 'Event not found' });
-					}
-					oddsService.getOddsById(event.oddsId).then(([odds]) => {
-						if (!odds) {
-							return next({ status: 404, message: 'Odds not found' });
-						}
-						let multiplier;
-						switch (req.body.prediction) {
-							case 'w1':
-								multiplier = odds.homeWin;
-								break;
-							case 'w2':
-								multiplier = odds.awayWin;
-								break;
-							case 'x':
-								multiplier = odds.draw;
-								break;
-						}
-						betService
-							.createBet({
-								...req.body,
-								multiplier,
-								eventId: event.id,
-							})
-							.then(([bet]) => {
-								var currentBalance = user.balance - req.body.betAmount;
-								authService
-									.updateUser(userId, { balance: currentBalance })
-									.then(() => {
-										services.emitter.statEmitter.emit('newBet');
-										return res.send({
-											...bet,
-											currentBalance: currentBalance,
-										});
-									});
-							});
-					});
+			const users = await authService.getAllUsers();
+			console.log(users, userId);
+			const user = users.find((u) => u.id == userId);
+			if (!user) {
+				return next({ status: 400, message: 'User does not exist' });
+			}
+			if (+user.balance < +req.body.betAmount) {
+				return next({ status: 400, message: 'Not enough balance' });
+			}
+			const [event] = await eventsService.getEventById(req.body.eventId);
+			if (!event) {
+				return next({ status: 404, message: 'Event not found' });
+			}
+			const [odds] = await oddsService.getOddsById(event.oddsId);
+			if (!odds) {
+				return next({ status: 404, message: 'Odds not found' });
+			}
+			const multiplier = getMultiplier(req.body.prediction, odds);
+			const [bet] = await betService.createBet({
+				...req.body,
+				multiplier,
+				eventId: event.id,
+			});
+			const currentBalance = user.balance - req.body.betAmount;
+			authService.updateUser(userId, { balance: currentBalance }).then(() => {
+				services.emitter.statEmitter.emit('newBet');
+				return res.send({
+					...bet,
+					currentBalance,
 				});
 			});
 		} catch (err) {

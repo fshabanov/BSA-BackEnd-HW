@@ -6,21 +6,21 @@ const {
 } = require('../../services');
 const jwt = require('jsonwebtoken');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
+const { getUserIdByToken } = require('../../helpers');
 
 const { validateBody, validateParams } = validatorMiddleware;
 
 router.get(
 	'/:id',
 	validateParams(authValidation.getUserById),
-	(req, res, next) => {
+	async (req, res, next) => {
 		try {
-			authService.getUserById(req.params.id).then(([result]) => {
-				if (!result) {
-					return next({ status: 404, message: 'User not found' });
-				}
-				return res.send({
-					...result,
-				});
+			const [result] = await authService.getUserById(req.params.id);
+			if (!result) {
+				return next({ status: 404, message: 'User not found' });
+			}
+			return res.send({
+				...result,
 			});
 		} catch (err) {
 			console.log(err);
@@ -29,11 +29,13 @@ router.get(
 	}
 );
 
-router.post('/', validateBody(authValidation.createUser), (req, res, next) => {
-	req.body.balance = 0;
-	authService
-		.createUser(req.body)
-		.then(([result]) => {
+router.post(
+	'/',
+	validateBody(authValidation.createUser),
+	async (req, res, next) => {
+		req.body.balance = 0;
+		try {
+			const [result] = await authService.createUser(req.body);
 			emitterService.statEmitter.emit('newUser');
 			return res.send({
 				...result,
@@ -42,8 +44,7 @@ router.post('/', validateBody(authValidation.createUser), (req, res, next) => {
 					process.env.JWT_SECRET
 				),
 			});
-		})
-		.catch((err) => {
+		} catch (err) {
 			console.log(err);
 			if (err.code == '23505') {
 				return next({
@@ -52,35 +53,34 @@ router.post('/', validateBody(authValidation.createUser), (req, res, next) => {
 				});
 			}
 			return next({ status: 500 });
-		});
-});
+		}
+	}
+);
 
 router.put(
 	'/:id',
 	authMiddleware.isLoggedIn,
 	validateBody(authValidation.updateUser),
-	(req, res, next) => {
+	async (req, res, next) => {
 		let token = req.headers['authorization'];
-		token = token.replace('Bearer ', '');
-		const tokenPayload = jwt.verify(token, process.env.JWT_SECRET);
-		if (req.params.id !== tokenPayload.id) {
+		const userId = getUserIdByToken(token);
+		if (req.params.id !== userId) {
 			return next({ status: 401, message: 'UserId mismatch' });
 		}
-		authService
-			.updateUser(req.params.id, req.body)
-			.then(([result]) => {
-				return res.send({
-					...result,
-				});
-			})
-			.catch((err) => {
-				if (err.code == '23505') {
-					console.log(err);
-					return next({ status: 400, message: err.detail });
-				}
-				console.log(err);
-				return next({ status: 500 });
+
+		try {
+			const [result] = await authService.updateUser(req.params.id, req.body);
+			return res.send({
+				...result,
 			});
+		} catch (err) {
+			if (err.code == '23505') {
+				console.log(err);
+				return next({ status: 400, message: err.detail });
+			}
+			console.log(err);
+			return next({ status: 500 });
+		}
 	}
 );
 
