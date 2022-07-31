@@ -1,6 +1,11 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const jwt = require('jsonwebtoken');
+const { ENV } = require('../src/common/enums/enums');
+
+const {
+	JWT: { SECRET },
+} = ENV;
 
 const { app } = require('../index');
 const { expect } = chai;
@@ -20,7 +25,7 @@ describe('/bets route', () => {
 		it('should create new bet', async () => {
 			const token = jwt.sign(
 				{ type: 'client', id: '0f290598-1b54-4a36-8c58-33caa7d08b5f' },
-				process.env.JWT_SECRET
+				SECRET
 			);
 			const { status, body } = await chai
 				.request(app)
@@ -53,7 +58,7 @@ describe('/bets route', () => {
 
 			const token = jwt.sign(
 				{ type: 'client', id: '0f290598-1b54-4a36-8c58-33caa7d08b5f' },
-				process.env.JWT_SECRET
+				SECRET
 			);
 			const { status, body } = await chai
 				.request(app)
@@ -81,7 +86,7 @@ describe('/bets route', () => {
 
 			const token = jwt.sign(
 				{ type: 'client', id: 'e4a9d82f-97f3-4e3d-adf9-09de4148a744' },
-				process.env.JWT_SECRET
+				SECRET
 			);
 			const { status, body } = await chai
 				.request(app)
@@ -102,7 +107,7 @@ describe('/bets route', () => {
 
 			const token = jwt.sign(
 				{ type: 'client', id: '0f290598-1b54-4a36-8c58-33caa7d08b5f' },
-				process.env.JWT_SECRET
+				SECRET
 			);
 			const { status, body } = await chai
 				.request(app)
@@ -123,7 +128,7 @@ describe('/bets route', () => {
 
 			const token = jwt.sign(
 				{ type: 'client', id: '0f290598-1b54-4a36-8c58-33caa7d08b5f' },
-				process.env.JWT_SECRET
+				SECRET
 			);
 			const { status, body } = await chai
 				.request(app)

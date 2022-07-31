@@ -14,22 +14,18 @@ router.post(
 	'/',
 	authMiddleware.isAdmin,
 	validateBody(eventValidation.createEvent),
-	(req, res, next) => {
+	async (req, res, next) => {
 		try {
-			oddsService.createOdds(req.body.odds).then(([odds]) => {
-				delete req.body.odds;
-				eventsService
-					.createEvent({
-						...req.body,
-						oddsId: odds.id,
-					})
-					.then(([event]) => {
-						emitterService.statEmitter.emit('newEvent');
-						return res.send({
-							...event,
-							odds,
-						});
-					});
+			const [odds] = await oddsService.createOdds(req.body.odds);
+			delete req.body.odds;
+			const [event] = await eventsService.createEvent({
+				...req.body,
+				oddsId: odds.id,
+			});
+			emitterService.emitNewEvent();
+			return res.send({
+				...event,
+				odds,
 			});
 		} catch (err) {
 			console.log(err);

@@ -1,8 +1,13 @@
 const jwt = require('jsonwebtoken');
+const { ENV } = require('../common/enums/enums');
+
+const {
+	JWT: { SECRET },
+} = ENV;
 
 const getUserIdByToken = (token) => {
 	token = token.replace('Bearer ', '');
-	const tokenPayload = jwt.verify(token, process.env.JWT_SECRET);
+	const tokenPayload = jwt.verify(token, SECRET);
 	return tokenPayload.id;
 };
 

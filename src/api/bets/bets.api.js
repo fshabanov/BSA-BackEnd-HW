@@ -1,12 +1,12 @@
 const router = require('express').Router();
 const { betValidation } = require('../../validation');
-const jwt = require('jsonwebtoken');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
 const {
 	auth: authService,
 	bet: betService,
 	events: eventsService,
 	odds: oddsService,
+	emitter: emitterService,
 } = require('../../services');
 const { getMultiplier, getUserIdByToken } = require('../../helpers');
 
@@ -17,13 +17,11 @@ router.post(
 	authMiddleware.isLoggedIn,
 	validateBody(betValidation.createBet),
 	async (req, res, next) => {
-		let token = req.headers['authorization'];
+		const token = req.headers['authorization'];
 		const userId = getUserIdByToken(token);
 		req.body.userId = userId;
 		try {
-			const users = await authService.getAllUsers();
-			console.log(users, userId);
-			const user = users.find((u) => u.id == userId);
+			const [user] = await authService.getUserById(userId);
 			if (!user) {
 				return next({ status: 400, message: 'User does not exist' });
 			}
@@ -45,12 +43,11 @@ router.post(
 				eventId: event.id,
 			});
 			const currentBalance = user.balance - req.body.betAmount;
-			authService.updateUser(userId, { balance: currentBalance }).then(() => {
-				services.emitter.statEmitter.emit('newBet');
-				return res.send({
-					...bet,
-					currentBalance,
-				});
+			await authService.updateUser(userId, { balance: currentBalance });
+			emitterService.emitNewBet();
+			return res.send({
+				...bet,
+				currentBalance,
 			});
 		} catch (err) {
 			console.log(err);

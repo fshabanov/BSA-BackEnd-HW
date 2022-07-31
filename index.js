@@ -1,13 +1,22 @@
-var express = require('express');
+const express = require('express');
 
 const routes = require('./src/api');
 
-const { initDb } = require('./src/db');
-const services = require('./src/services');
+const { initDb, db } = require('./src/db');
+const { emitter: emitterService } = require('./src/services');
 const data = require('./src/data');
-var app = express();
+const app = express();
 
-var port = 3000;
+// logger
+const morgan = require('morgan');
+
+app.use(
+	morgan(
+		'METHOD - :method; URL - :url; STATUS - :status; RESPONSE TIME - :response-time ms'
+	)
+);
+
+const port = 3000;
 
 app.use(express.json());
 app.use(initDb);
@@ -19,7 +28,7 @@ app.use('/events', routes.eventsRouter.router);
 app.use('/bets', routes.betRouter.router);
 app.use('/stats', routes.statsRouter.router);
 
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
 	const { status, message } = err;
 	if (status === 500) {
 		res.status(500).send('Internal Server Error');
@@ -28,18 +37,27 @@ app.use((err, req, res, next) => {
 	}
 });
 
-app.listen(port, () => {
-	services.emitter.statEmitter.on('newUser', () => {
+const server = app.listen(port, () => {
+	emitterService.onNewUser(() => {
 		data.statsData.stats.totalUsers++;
 	});
-	services.emitter.statEmitter.on('newBet', () => {
+	emitterService.onNewBet(() => {
 		data.statsData.stats.totalBets++;
 	});
-	services.emitter.statEmitter.on('newEvent', () => {
+	emitterService.onNewEvent(() => {
 		data.statsData.stats.totalEvents++;
 	});
 
 	console.log(`App listening at http://localhost:${port}`);
+});
+
+process.on('SIGTERM', () => {
+	// Closing HTTP server
+	server.close(() => {
+		// HTTP server closed
+		db.destroy();
+		process.exit(0);
+	});
 });
 
 // Do not change this line

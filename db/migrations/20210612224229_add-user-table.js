@@ -5,7 +5,7 @@ exports.up = function (knex) {
 		table.string('email').unique().notNullable();
 		table.string('phone').unique().notNullable();
 		table.string('name').notNullable();
-		table.float('balance').notNullable();
+		table.float('balance').notNullable().defaultTo(0);
 		table.string('city');
 		table.timestamp('createdAt').defaultTo(knex.fn.now());
 		table.timestamp('updatedAt').defaultTo(knex.fn.now());

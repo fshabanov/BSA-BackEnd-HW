@@ -1,4 +1,9 @@
 const jwt = require('jsonwebtoken');
+const { ENV } = require('../../common/enums/enums');
+
+const {
+	JWT: { SECRET },
+} = ENV;
 
 const notAuthorized = (next) =>
 	next({ status: 401, message: 'Not Authorized' });
@@ -10,7 +15,7 @@ const isAdmin = (req, _res, next) => {
 	}
 	token = token.replace('Bearer ', '');
 	try {
-		var tokenPayload = jwt.verify(token, process.env.JWT_SECRET);
+		var tokenPayload = jwt.verify(token, SECRET);
 		if (tokenPayload.type != 'admin') {
 			throw new Error();
 		}
@@ -27,7 +32,7 @@ const isLoggedIn = (req, _res, next) => {
 	}
 	token = token.replace('Bearer ', '');
 	try {
-		jwt.verify(token, process.env.JWT_SECRET);
+		jwt.verify(token, SECRET);
 
 		next();
 	} catch (err) {

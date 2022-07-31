@@ -8,6 +8,12 @@ const jwt = require('jsonwebtoken');
 const { authMiddleware, validatorMiddleware } = require('../../middlewares');
 const { getUserIdByToken } = require('../../helpers');
 
+const { ENV } = require('../../common/enums/enums');
+
+const {
+	JWT: { SECRET },
+} = ENV;
+
 const { validateBody, validateParams } = validatorMiddleware;
 
 router.get(
@@ -33,16 +39,12 @@ router.post(
 	'/',
 	validateBody(authValidation.createUser),
 	async (req, res, next) => {
-		req.body.balance = 0;
 		try {
 			const [result] = await authService.createUser(req.body);
-			emitterService.statEmitter.emit('newUser');
+			emitterService.emitNewUser();
 			return res.send({
 				...result,
-				accessToken: jwt.sign(
-					{ id: result.id, type: result.type },
-					process.env.JWT_SECRET
-				),
+				accessToken: jwt.sign({ id: result.id, type: result.type }, SECRET),
 			});
 		} catch (err) {
 			console.log(err);
@@ -70,9 +72,7 @@ router.put(
 
 		try {
 			const [result] = await authService.updateUser(req.params.id, req.body);
-			return res.send({
-				...result,
-			});
+			return res.send(result);
 		} catch (err) {
 			if (err.code == '23505') {
 				console.log(err);
