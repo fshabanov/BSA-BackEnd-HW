@@ -15,7 +15,8 @@
     "reset:db": "knex migrate:rollback && npm run migrate:latest && npm run seed",
     "test": "npm run reset:db && mocha ./tests/index.test.js --exit",
     "docker:test:db": "docker-compose -f docker-compose.test.yml up -d hw_db_test",
-    "docker:test": "docker-compose -f docker-compose.test.yml up hm_test"
+    "docker:test": "docker-compose -f docker-compose.test.yml up hm_test",
+    "pre-commit": "npm test && eslint"
   },
   "author": "",
   "license": "ISC",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "chai": "4.3.4",
     "chai-http": "4.3.0",
+    "eslint": "^8.21.0",
     "mocha": "9.0.1",
     "nodemon": "2.0.7"
   }
